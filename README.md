@@ -1,5 +1,6 @@
 # electron-vue
 
+将目录下的所有文件(包括子文件夹内的文件)全都提取到一个总目录中
 ## Project setup
 ```
 yarn install
