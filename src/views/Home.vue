@@ -30,8 +30,9 @@
 const path = window.require("path");
 const fs = window.require("fs");
 const fsp = fs.promises;
-const { shell, dialog } = window.require("electron");
-
+const fse = window.require("fs-extra");
+const { shell } = window.require("electron");
+const { ipcRenderer } = window.require("electron");
 export default {
   name: "home",
   data() {
@@ -45,6 +46,17 @@ export default {
   },
   methods: {
     addFile(e) {
+      console.log(this.uuid(6, 16));
+      const originFiles = [...e.dataTransfer.files];
+      const isAllDir = originFiles.every(file =>
+        fs.statSync(file.path).isDirectory()
+      );
+
+      if (!isAllDir) {
+        ipcRenderer.send("confirmDialog");
+        return false;
+      }
+
       // 将伪数组转换成数组
       this.droppedFiles = [...e.dataTransfer.files];
 
@@ -86,6 +98,61 @@ export default {
       }
     },
 
+    // 删除文件
+    removeDir(url) {
+      let files = [];
+      if (fs.existsSync(url)) {
+        files = fs.readdirSync(url);
+        files.forEach((file, index) => {
+          let curPath = path.join(url, file);
+
+          //fs.statSync同步读取文件夹文件，如果是文件夹，在重复触发函数
+          if (fs.statSync(curPath).isDirectory()) {
+            console.log(`检测到目录 ${curPath}`);
+            this.removeDir(curPath);
+          } else {
+            fs.unlinkSync(curPath);
+            console.log(`已删除文件 ${curPath}`);
+          }
+        });
+        // 删除文件夹
+        fs.rmdirSync(url);
+      } else {
+        console.log("已删除文件");
+      }
+    },
+    uuid(len, radix) {
+      var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".split(
+        ""
+      );
+      var uuid = [],
+        i;
+      radix = radix || chars.length;
+
+      if (len) {
+        // Compact form
+        for (i = 0; i < len; i++) uuid[i] = chars[0 | (Math.random() * radix)];
+      } else {
+        // rfc4122, version 4 form
+        var r;
+
+        // rfc4122 requires these characters
+        uuid[8] = uuid[13] = uuid[18] = uuid[23] = "-";
+        uuid[14] = "4";
+
+        // Fill in random data. At i==19 set the high bits of clock sequence as
+        // per rfc4122, sec. 4.1.5
+        for (i = 0; i < 36; i++) {
+          if (!uuid[i]) {
+            r = 0 | (Math.random() * 16);
+            uuid[i] = chars[i == 19 ? (r & 0x3) | 0x8 : r];
+          }
+        }
+      }
+
+      return uuid.join("");
+    },
+
     /*
     dirPath: 原文件夹
     targetPath: 新的目标文件夹
@@ -95,41 +162,78 @@ export default {
       files.forEach(async (file, index) => {
         const filePath = path.resolve(dirPath, file);
         const targetFilePath = path.resolve(targetDirPath, file);
-        let readableStream;
-        let writableStream;
+        // let readableStream;
+        // let writableStream;
 
         let isDir = await this.isDir(filePath);
 
         //不是目录就执行复制，否者递归
         if (!isDir) {
-          // console.log({filePath,dirPath,targetDirPath});
+          // 检查是否有重名文件
+          const targetFiles = await this.getAllFiles(targetDirPath);
+          // 如果有重名文件
+
+          if (targetFiles.includes(file)) {
+            let fileExt = path.extname(filePath);
+            let fileName = path.basename(filePath, fileExt);
+            let newFileName = `${fileName}-${this.uuid(6, 16)}`;
+            let newPath = path.resolve(dirPath, `${newFileName}${fileExt}`);
+            let newTargetFilePath = path.resolve(
+              targetDirPath,
+              `${newFileName}${fileExt}`
+            );
+            await fsp.rename(filePath, newPath);
+            await fsp.rename(newPath, newTargetFilePath);
+          } else {
+            await fsp.rename(filePath, targetFilePath);
+          }
+
           // 创建读取流
-          readableStream = await fs.createReadStream(filePath);
-          // 创建写入流
-          writableStream = await fs.createWriteStream(targetFilePath);
-          // 通过管道来传输流
-          await readableStream.pipe(writableStream);
-          let timer = setTimeout(() => {
-            this.loading = false;
-            shell.showItemInFolder(targetDirPath);
-            clearTimeout(timer);
-          }, 1000);
+          // readableStream = await fs.createReadStream(filePath);
+          // // 创建写入流
+          // writableStream = await fs.createWriteStream(targetFilePath);
+          // // 通过管道来传输流
+          // await readableStream.pipe(writableStream);
+          // try {
+          //   await fse.move(filePath, targetDirPath);
+          // } catch (error) {
+          //   console.log(error.message);
+          // }
         } else {
-          this.moveFiles(filePath, targetDirPath);
+          await this.moveFiles(filePath, targetDirPath);
         }
+        // console.log(dirPath);
       });
+      let timer = setTimeout(async () => {
+        await this.removeDir(dirPath);
+        this.loading = false;
+        shell.showItemInFolder(targetDirPath);
+        clearTimeout(timer);
+      }, 1000);
     },
 
     async startTrans(dirPath) {
       this.loading = true;
-      const targetDirPath = path.resolve(dirPath, "../target");
-      const parentPath = path.dirname(dirPath);
-      const files = await this.getAllFiles(parentPath);
-      // console.log(files);
-      if (!files.includes("target")) {
-        await fsp.mkdir(targetDirPath);
-        await this.moveFiles(dirPath, targetDirPath);
+      if (this.isDropMulti) {
+        // 拖拽多个文件夹的情况
+        this.droppedFiles.forEach(async (file, index) => {
+          // console.log(file);
+          const targetDirPath = path.resolve(dirPath, "合并");
+          const filePath = file.path;
+          const files = await this.getAllFiles(dirPath);
+          if (!files.includes("合并")) {
+            await fsp.mkdir(targetDirPath, { recursive: true });
+          }
+          await this.moveFiles(filePath, targetDirPath);
+        });
       } else {
+        const targetDirPath = path.resolve(dirPath, "../合并");
+        const parentPath = path.dirname(dirPath);
+        const files = await this.getAllFiles(parentPath);
+        // console.log(files);
+        if (!files.includes("合并")) {
+          await fsp.mkdir(targetDirPath, { recursive: true });
+        }
         await this.moveFiles(dirPath, targetDirPath);
       }
     }

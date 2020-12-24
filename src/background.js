@@ -8,7 +8,9 @@ import {
 } from "vue-cli-plugin-electron-builder/lib";
 const isDevelopment = process.env.NODE_ENV !== "production";
 const globalShortcut = electron.globalShortcut;
+
 const { ipcMain } = require("electron");
+
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let win;
@@ -21,11 +23,11 @@ protocol.registerSchemesAsPrivileged([
 function createWindow() {
   // Create the browser window.
   win = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 502,
+    height: 376,
     autoHideMenuBar: true,
     frame: false,
-    resizable: false,
+    // resizable: false,
     titleBarStyle: "hidden",
     webPreferences: {
       nodeIntegration: true
@@ -71,6 +73,13 @@ ipcMain.on("close", () => {
 });
 ipcMain.on("minimize", () => {
   win.minimize();
+});
+ipcMain.on("confirmDialog", () => {
+  dialog.showMessageBox({
+    type: "info",
+    title: "确认",
+    message: "请确认选择的文件是否都是文件夹"
+  });
 });
 
 // This method will be called when Electron has finished

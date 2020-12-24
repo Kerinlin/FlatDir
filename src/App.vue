@@ -27,8 +27,8 @@ export default {
   overflow: hidden;
   width: 100vw;
   height: 100vh;
-  background-image: url("./assets/bg1.png");
-  background-size: cover;
+  background-image: url("./assets/bg2.png");
+  background-size: contain;
   // background-repeat: no-repeat;
   .header-container {
     width: 100%;
