@@ -1,7 +1,9 @@
 {
-  "name": "electron-vue-demo",
+  "name": "flat_dir",
   "version": "0.1.0",
   "private": true,
+  "author": "Kerinlin",
+  "description": "move dir in one directory",
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
@@ -15,7 +17,6 @@
   "dependencies": {
     "core-js": "^3.4.3",
     "electron-updater": "^4.3.5",
-    "fs-extra": "^9.0.1",
     "normalize.css": "^8.0.1",
     "vue": "^2.6.10",
     "vue-router": "^3.1.3",

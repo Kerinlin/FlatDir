@@ -30,7 +30,6 @@
 const path = window.require("path");
 const fs = window.require("fs");
 const fsp = fs.promises;
-const fse = window.require("fs-extra");
 const { shell } = window.require("electron");
 const { ipcRenderer } = window.require("electron");
 export default {
@@ -46,7 +45,6 @@ export default {
   },
   methods: {
     addFile(e) {
-      console.log(this.uuid(6, 16));
       const originFiles = [...e.dataTransfer.files];
       const isAllDir = originFiles.every(file =>
         fs.statSync(file.path).isDirectory()
@@ -162,54 +160,57 @@ export default {
       files.forEach(async (file, index) => {
         const filePath = path.resolve(dirPath, file);
         const targetFilePath = path.resolve(targetDirPath, file);
-        // let readableStream;
-        // let writableStream;
 
         let isDir = await this.isDir(filePath);
 
         //不是目录就执行复制，否者递归
         if (!isDir) {
-          // 检查是否有重名文件
+          // 检查移动目标文件夹是否有重名文件
           const targetFiles = await this.getAllFiles(targetDirPath);
-          // 如果有重名文件
+          const fileIndex = targetFiles.indexOf(file);
 
-          if (targetFiles.includes(file)) {
-            let fileExt = path.extname(filePath);
-            let fileName = path.basename(filePath, fileExt);
-            let newFileName = `${fileName}-${this.uuid(6, 16)}`;
-            let newPath = path.resolve(dirPath, `${newFileName}${fileExt}`);
-            let newTargetFilePath = path.resolve(
-              targetDirPath,
-              `${newFileName}${fileExt}`
-            );
-            await fsp.rename(filePath, newPath);
-            await fsp.rename(newPath, newTargetFilePath);
+          if (fs.existsSync(targetFilePath)) {
+            // 获取两边文件的信息，进行对比
+            const targetFileInfo = await fsp.stat(targetFilePath);
+            const originFileInfo = await fsp.stat(filePath);
+
+            // 如果有重名文件，判断文件大小是否一致
+            if (fileIndex >= 0 && originFileInfo.size !== targetFileInfo.size) {
+              // 获取原文件的名称以及后缀格式
+              let fileExt = path.extname(filePath);
+              let fileName = path.basename(filePath, fileExt);
+
+              // 生成有唯一性的文件名称
+              let newFileName = `${fileName}-${this.uuid(6, 16)}`;
+              let newPath = path.resolve(dirPath, `${newFileName}${fileExt}`);
+              let newTargetFilePath = path.resolve(
+                targetDirPath,
+                `${newFileName}${fileExt}`
+              );
+
+              // 重命名
+              await fsp.rename(filePath, newPath);
+
+              // 移动至新目标文件夹
+              await fsp.rename(newPath, newTargetFilePath);
+            } else {
+              // 不是同名文件就直接复制移动
+              await fsp.rename(filePath, targetFilePath);
+            }
           } else {
             await fsp.rename(filePath, targetFilePath);
           }
-
-          // 创建读取流
-          // readableStream = await fs.createReadStream(filePath);
-          // // 创建写入流
-          // writableStream = await fs.createWriteStream(targetFilePath);
-          // // 通过管道来传输流
-          // await readableStream.pipe(writableStream);
-          // try {
-          //   await fse.move(filePath, targetDirPath);
-          // } catch (error) {
-          //   console.log(error.message);
-          // }
         } else {
+          // 是目录，执行递归操作
           await this.moveFiles(filePath, targetDirPath);
         }
-        // console.log(dirPath);
+        let timer = setTimeout(async () => {
+          await this.removeDir(dirPath);
+          shell.showItemInFolder(targetDirPath);
+          this.loading = false;
+          clearTimeout(timer);
+        }, 1000);
       });
-      let timer = setTimeout(async () => {
-        await this.removeDir(dirPath);
-        this.loading = false;
-        shell.showItemInFolder(targetDirPath);
-        clearTimeout(timer);
-      }, 1000);
     },
 
     async startTrans(dirPath) {
