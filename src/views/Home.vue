@@ -206,7 +206,7 @@ export default {
         }
         let timer = setTimeout(async () => {
           await this.removeDir(dirPath);
-          shell.showItemInFolder(targetDirPath);
+          // shell.showItemInFolder(targetDirPath);
           this.loading = false;
           clearTimeout(timer);
         }, 1000);
