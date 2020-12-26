@@ -1,6 +1,6 @@
 {
   "name": "flat_dir",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "author": "Kerinlin",
   "description": "move dir in one directory",
