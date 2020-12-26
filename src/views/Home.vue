@@ -40,7 +40,8 @@ export default {
       loading: false,
       back: false,
       droppedFiles: [],
-      isDropMulti: false
+      isDropMulti: false,
+      result: []
     };
   },
   methods: {
@@ -98,13 +99,11 @@ export default {
 
     // 删除文件
     removeDir(url) {
-      let files = [];
       if (fs.existsSync(url)) {
-        files = fs.readdirSync(url);
+        const files = fs.readdirSync(url);
         files.forEach((file, index) => {
-          let curPath = path.join(url, file);
+          const curPath = path.join(url, file);
 
-          //fs.statSync同步读取文件夹文件，如果是文件夹，在重复触发函数
           if (fs.statSync(curPath).isDirectory()) {
             console.log(`检测到目录 ${curPath}`);
             this.removeDir(curPath);
@@ -119,6 +118,8 @@ export default {
         console.log("已删除文件");
       }
     },
+
+    // 生成uuid
     uuid(len, radix) {
       var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".split(
         ""
@@ -166,24 +167,38 @@ export default {
         //不是目录就执行复制，否者递归
         if (!isDir) {
           // 检查移动目标文件夹是否有重名文件
-          const targetFiles = await this.getAllFiles(targetDirPath);
-          const fileIndex = targetFiles.indexOf(file);
+
+          console.log("遍历了所有的文件");
+          console.log({ filePath, targetFilePath });
 
           if (fs.existsSync(targetFilePath)) {
+            console.log(
+              `目标文件 ${file} 存在于目标文件夹 ${targetDirPath} 中`
+            );
+            console.log({ filePath, targetFilePath });
+
+            const targetFiles = await this.getAllFiles(targetDirPath);
+            const fileIndex = targetFiles.indexOf(file);
+
+            console.log(`同名文件 ${file} 的下标为 ${fileIndex}`);
+
             // 获取两边文件的信息，进行对比
             const targetFileInfo = await fsp.stat(targetFilePath);
             const originFileInfo = await fsp.stat(filePath);
 
+            console.log(
+              `原文件与目标文件夹文件的大小分别为 ${originFileInfo.size}  ${targetFileInfo.size}`
+            );
             // 如果有重名文件，判断文件大小是否一致
             if (fileIndex >= 0 && originFileInfo.size !== targetFileInfo.size) {
               // 获取原文件的名称以及后缀格式
-              let fileExt = path.extname(filePath);
-              let fileName = path.basename(filePath, fileExt);
+              const fileExt = path.extname(filePath);
+              const fileName = path.basename(filePath, fileExt);
 
-              // 生成有唯一性的文件名称
-              let newFileName = `${fileName}-${this.uuid(6, 16)}`;
-              let newPath = path.resolve(dirPath, `${newFileName}${fileExt}`);
-              let newTargetFilePath = path.resolve(
+              // 生成新的文件名称
+              const newFileName = `${fileName}-${this.uuid(6, 16)}`;
+              const newPath = path.resolve(dirPath, `${newFileName}${fileExt}`);
+              const newTargetFilePath = path.resolve(
                 targetDirPath,
                 `${newFileName}${fileExt}`
               );
@@ -194,10 +209,13 @@ export default {
               // 移动至新目标文件夹
               await fsp.rename(newPath, newTargetFilePath);
             } else {
+              console.log("目标文件同名但是文件内容不一样");
+              console.log({ filePath, targetFilePath });
               // 不是同名文件就直接复制移动
               await fsp.rename(filePath, targetFilePath);
             }
           } else {
+            console.log("目标文件不存在于目标文件夹中");
             await fsp.rename(filePath, targetFilePath);
           }
         } else {
@@ -213,19 +231,24 @@ export default {
       });
     },
 
+    getMultiFile(dirPath, files) {},
+
     async startTrans(dirPath) {
       this.loading = true;
       if (this.isDropMulti) {
         // 拖拽多个文件夹的情况
-        this.droppedFiles.forEach(async (file, index) => {
-          // console.log(file);
-          const targetDirPath = path.resolve(dirPath, "合并");
+
+        // 在同级目录下创建新的目标文件夹
+        const targetDirPath = path.resolve(dirPath, "合并");
+        const files = await this.getAllFiles(dirPath);
+        if (!files.includes("合并")) {
+          await fsp.mkdir(targetDirPath, { recursive: true });
+        }
+
+        this.droppedFiles.forEach((file, index) => {
+          console.log(file);
           const filePath = file.path;
-          const files = await this.getAllFiles(dirPath);
-          if (!files.includes("合并")) {
-            await fsp.mkdir(targetDirPath, { recursive: true });
-          }
-          await this.moveFiles(filePath, targetDirPath);
+          this.moveFiles(filePath, targetDirPath);
         });
       } else {
         const targetDirPath = path.resolve(dirPath, "../合并");
