@@ -224,7 +224,6 @@ export default {
         }
         let timer = setTimeout(async () => {
           await this.removeDir(dirPath);
-          shell.showItemInFolder(targetDirPath);
           this.loading = false;
           clearTimeout(timer);
         }, 1000);
@@ -250,6 +249,7 @@ export default {
           const filePath = file.path;
           this.moveFiles(filePath, targetDirPath);
         });
+        shell.showItemInFolder(targetDirPath);
       } else {
         const targetDirPath = path.resolve(dirPath, "../合并");
         const parentPath = path.dirname(dirPath);
@@ -259,6 +259,7 @@ export default {
           await fsp.mkdir(targetDirPath, { recursive: true });
         }
         await this.moveFiles(dirPath, targetDirPath);
+        shell.showItemInFolder(targetDirPath);
       }
     }
   }
