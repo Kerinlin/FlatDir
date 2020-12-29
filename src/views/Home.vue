@@ -76,7 +76,7 @@ export default {
     // 判断是否是文件夹
     async isDir(path) {
       try {
-        let res = await fsp.stat(path);
+        const res = await fsp.stat(path);
         if (res.isDirectory()) {
           return true;
         } else {
@@ -90,7 +90,7 @@ export default {
     // 获取文件路径下的所有文件
     async getAllFiles(path) {
       try {
-        let res = await fsp.readdir(path);
+        const res = await fsp.readdir(path);
         return res;
       } catch (error) {
         console.log(error);
@@ -121,10 +121,10 @@ export default {
 
     // 生成uuid
     uuid(len, radix) {
-      var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".split(
+      const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".split(
         ""
       );
-      var uuid = [],
+      let uuid = [],
         i;
       radix = radix || chars.length;
 
@@ -229,8 +229,6 @@ export default {
         }, 1000);
       });
     },
-
-    getMultiFile(dirPath, files) {},
 
     async startTrans(dirPath) {
       this.loading = true;
